@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DDM — CAD vs Print Accuracy</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Rajdhani:wght@300;500;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #111418;
+    --card: #161b22;
+    --border: #21262d;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --accent3: #7cfc00;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --error-neg: #ff4d6d;
+    --error-pos: #00e5ff;
+    --error-zero: #7cfc00;
+    --grid-line: rgba(0,229,255,0.06);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  /* Grid background */
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events:none;
+    z-index:0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: relative;
+    z-index: 10;
+    padding: 36px 48px 24px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(0,229,255,0.04) 0%, transparent 100%);
+    display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+  }
+  .header-left {}
+  .badge {
+    display:inline-block; font-family:'Space Mono',monospace; font-size:10px;
+    color:var(--accent); border:1px solid var(--accent); padding:3px 10px;
+    letter-spacing:2px; margin-bottom:10px; text-transform:uppercase;
+    background: rgba(0,229,255,0.07);
+  }
+  h1 {
+    font-family:'Orbitron',monospace; font-size:clamp(18px,3vw,32px);
+    font-weight:900; letter-spacing:1px; line-height:1.1;
+    background: linear-gradient(135deg, var(--accent) 0%, #ffffff 60%, var(--accent2) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .subtitle { font-size:13px; color:var(--muted); margin-top:6px; letter-spacing:1px; font-weight:300; }
+  .header-meta { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+  .meta-chip {
+    font-family:'Space Mono',monospace; font-size:10px; color:var(--muted);
+    background:var(--card); border:1px solid var(--border); padding:4px 10px; letter-spacing:1px;
+  }
+  .meta-chip span { color:var(--accent); }
+
+  /* ── NAV TABS ── */
+  nav {
+    position:sticky; top:0; z-index:20;
+    display:flex; gap:0; border-bottom:1px solid var(--border);
+    background: rgba(10,12,16,0.95); backdrop-filter:blur(12px);
+    overflow-x:auto;
+  }
+  nav button {
+    font-family:'Space Mono',monospace; font-size:11px; letter-spacing:1.5px;
+    background:none; border:none; color:var(--muted); cursor:pointer;
+    padding:14px 22px; text-transform:uppercase; white-space:nowrap;
+    border-bottom:2px solid transparent; transition: all .2s;
+    position:relative;
+  }
+  nav button:hover { color:var(--text); }
+  nav button.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+  /* ── SECTIONS ── */
+  section { display:none; padding:32px 48px; position:relative; z-index:5; max-width:1400px; margin:0 auto; }
+  section.active { display:block; animation: fadeIn .3s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+
+  /* ── CARDS ── */
+  .card {
+    background:var(--card); border:1px solid var(--border);
+    padding:24px; margin-bottom:20px; position:relative;
+    overflow:hidden;
+  }
+  .card::before {
+    content:''; position:absolute; top:0; left:0; width:3px; height:100%;
+    background: linear-gradient(180deg, var(--accent), transparent);
+  }
+  .card-title {
+    font-family:'Space Mono',monospace; font-size:11px;
+    color:var(--accent); letter-spacing:2px; text-transform:uppercase; margin-bottom:16px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .card-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+  /* ── FORMS ── */
+  .form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; }
+  label { display:flex; flex-direction:column; gap:5px; font-size:12px; color:var(--muted); letter-spacing:1px; font-weight:500; }
+  input, select, textarea {
+    background:var(--surface); border:1px solid var(--border);
+    color:var(--text); font-family:'Space Mono',monospace; font-size:12px;
+    padding:9px 12px; outline:none; transition: border-color .2s;
+    width:100%;
+  }
+  input:focus, select:focus, textarea:focus { border-color:var(--accent); }
+  select option { background:var(--surface); }
+  textarea { resize:vertical; min-height:60px; }
+
+  .btn {
+    font-family:'Space Mono',monospace; font-size:11px; letter-spacing:2px;
+    padding:10px 24px; border:1px solid; cursor:pointer; text-transform:uppercase;
+    transition: all .2s; position:relative; overflow:hidden;
+  }
+  .btn-primary { background:var(--accent); border-color:var(--accent); color:#000; font-weight:700; }
+  .btn-primary:hover { background:transparent; color:var(--accent); }
+  .btn-danger { background:transparent; border-color:var(--error-neg); color:var(--error-neg); }
+  .btn-danger:hover { background:var(--error-neg); color:#000; }
+  .btn-sm { padding:6px 14px; font-size:10px; }
+
+  /* ── TABLE ── */
+  .table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  thead tr { border-bottom:1px solid var(--accent); }
+  th { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:2px; color:var(--accent);
+       padding:10px 12px; text-align:left; text-transform:uppercase; white-space:nowrap; }
+  td { padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  tr:hover td { background:rgba(0,229,255,0.03); }
+  .error-cell { font-family:'Space Mono',monospace; font-size:12px; font-weight:700; }
+  .neg { color:var(--error-neg); }
+  .pos { color:var(--error-pos); }
+  .zero { color:var(--error-zero); }
+  .no-data { text-align:center; color:var(--muted); padding:40px; font-size:12px; letter-spacing:2px; }
+
+  /* ── STAT CARDS ── */
+  .stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px; margin-bottom:24px; }
+  .stat-card {
+    background:var(--card); border:1px solid var(--border);
+    padding:18px 20px; text-align:center;
+  }
+  .stat-val { font-family:'Orbitron',monospace; font-size:28px; font-weight:700; color:var(--accent); line-height:1; }
+  .stat-label { font-size:10px; color:var(--muted); letter-spacing:2px; margin-top:6px; text-transform:uppercase; }
+
+  /* ── CHART ── */
+  .chart-container { position:relative; margin-top:12px; }
+  canvas { max-width:100%; }
+
+  /* ── OVERVIEW SHAPES ── */
+  .shapes-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
+  .shape-card {
+    background:var(--card); border:1px solid var(--border);
+    padding:20px; position:relative; overflow:hidden; cursor:pointer;
+    transition: border-color .2s, transform .2s;
+  }
+  .shape-card:hover { border-color:var(--accent); transform:translateY(-2px); }
+  .shape-icon { font-size:32px; margin-bottom:12px; }
+  .shape-name { font-family:'Orbitron',monospace; font-size:13px; font-weight:700; color:var(--text); margin-bottom:6px; }
+  .shape-desc { font-size:12px; color:var(--muted); line-height:1.5; }
+  .shape-dims { margin-top:10px; display:flex; flex-wrap:wrap; gap:5px; }
+  .dim-tag { font-family:'Space Mono',monospace; font-size:9px; background:rgba(0,229,255,0.1);
+             border:1px solid rgba(0,229,255,0.25); color:var(--accent); padding:2px 7px; }
+
+  /* ── DEFECTS ── */
+  .defect-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media(max-width:600px){ .defect-row { grid-template-columns:1fr; } }
+
+  /* ── TOAST ── */
+  #toast {
+    position:fixed; bottom:24px; right:24px; z-index:999;
+    background:var(--accent); color:#000; font-family:'Space Mono',monospace;
+    font-size:11px; letter-spacing:1px; padding:12px 20px;
+    transform:translateY(80px); opacity:0; transition:all .3s;
+  }
+  #toast.show { transform:translateY(0); opacity:1; }
+
+  /* ── SECTION TITLE ── */
+  .sec-title {
+    font-family:'Orbitron',monospace; font-size:15px; font-weight:700;
+    color:var(--text); margin-bottom:20px; letter-spacing:2px;
+    display:flex; align-items:center; gap:12px;
+  }
+  .sec-title span { color:var(--accent); }
+  .sec-title::before { content:'▸'; color:var(--accent); }
+
+  /* DEFECT SOLUTION chip */
+  .solution-chip {
+    background:rgba(124,252,0,0.08); border:1px solid rgba(124,252,0,0.25);
+    color:var(--accent3); font-size:11px; padding:3px 8px; display:inline-block;
+    margin-top:4px;
+  }
+  .defect-chip {
+    background:rgba(255,77,109,0.08); border:1px solid rgba(255,77,109,0.25);
+    color:var(--error-neg); font-size:11px; padding:3px 8px; display:inline-block;
+  }
+
+  hr.divider { border:none; border-top:1px solid var(--border); margin:24px 0; }
+
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  @media(max-width:700px){.row2{grid-template-columns:1fr;} section{padding:20px 16px;} header{padding:20px 16px;}}
+
+  .infill-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; }
+  .infill-card {
+    background:var(--surface); border:1px solid var(--border);
+    padding:14px; text-align:center; cursor:pointer; transition:border-color .2s;
+  }
+  .infill-card:hover, .infill-card.selected { border-color:var(--accent); background:rgba(0,229,255,0.06); }
+  .infill-card .icon { font-size:22px; margin-bottom:4px; }
+  .infill-card .name { font-size:11px; color:var(--text); font-weight:600; }
+
+  .param-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; }
+  
+  /* summary bar */
+  .error-bar-wrap { display:flex; align-items:center; gap:8px; }
+  .error-bar { height:6px; border-radius:0; background:var(--border); flex:1; overflow:hidden; }
+  .error-bar-fill { height:100%; transition:width .4s; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="badge">Digital Direct Manufacturing</div>
+    <h1>CAD VS PRINT<br>ACCURACY STUDY</h1>
+    <div class="subtitle">Dimensional Deviation Analysis · PLA Material · FFF Process</div>
+  </div>
+  <div class="header-meta">
+    <div class="meta-chip">MATERIAL: <span>PLA</span></div>
+    <div class="meta-chip">PROCESS: <span>FFF / FDM</span></div>
+    <div class="meta-chip">UNIT: <span>mm</span></div>
+    <div class="meta-chip" id="entry-count">ENTRIES: <span id="cnt">0</span></div>
+  </div>
+</header>
+
+<nav>
+  <button class="active" onclick="showTab('overview',this)">Overview</button>
+  <button onclick="showTab('data',this)">Data Entry</button>
+  <button onclick="showTab('results',this)">Results Table</button>
+  <button onclick="showTab('defects',this)">Defects & Solutions</button>
+  <button onclick="showTab('analysis',this)">Analysis</button>
+</nav>
+
+<!-- ═══════════════════ OVERVIEW ═══════════════════ -->
+<section id="overview" class="active">
+  <div class="sec-title"><span>01</span> Test Geometries</div>
+  <div class="shapes-grid">
+    <div class="shape-card" onclick="showTab('data',document.querySelectorAll('nav button')[1]);setShape('Calibration Cube')">
+      <div class="shape-icon">⬛</div>
+      <div class="shape-name">Calibration Cube</div>
+      <div class="shape-desc">Most important test. Verifies dimensional accuracy along all three axes independently.</div>
+      <div class="shape-dims">
+        <span class="dim-tag">X: 20mm</span><span class="dim-tag">Y: 20mm</span><span class="dim-tag">Z: 20mm</span>
+      </div>
+    </div>
+    <div class="shape-card" onclick="showTab('data',document.querySelectorAll('nav button')[1]);setShape('Cylinder')">
+      <div class="shape-icon">🔵</div>
+      <div class="shape-name">Cylinder</div>
+      <div class="shape-desc">Tests circular accuracy and roundness. Reveals belt tension or stepper step errors.</div>
+      <div class="shape-dims">
+        <span class="dim-tag">Ø: 20mm</span><span class="dim-tag">H: 20mm</span>
+      </div>
+    </div>
+    <div class="shape-card" onclick="showTab('data',document.querySelectorAll('nav button')[1]);setShape('Hole Test Plate')">
+      <div class="shape-icon">⭕</div>
+      <div class="shape-name">Hole Test Plate</div>
+      <div class="shape-desc">3D printers consistently print holes smaller than CAD. Measures hole shrinkage per size.</div>
+      <div class="shape-dims">
+        <span class="dim-tag">Ø5mm</span><span class="dim-tag">Ø10mm</span><span class="dim-tag">Ø15mm</span>
+      </div>
+    </div>
+    <div class="shape-card" onclick="showTab('data',document.querySelectorAll('nav button')[1]);setShape('Wall Thickness Test')">
+      <div class="shape-icon">▬</div>
+      <div class="shape-name">Wall Thickness</div>
+      <div class="shape-desc">Determines minimum printable wall. Tests extrusion width precision.</div>
+      <div class="shape-dims">
+        <span class="dim-tag">0.5mm</span><span class="dim-tag">1mm</span><span class="dim-tag">2mm</span><span class="dim-tag">3mm</span>
+      </div>
+    </div>
+    <div class="shape-card">
+      <div class="shape-icon">📐</div>
+      <div class="shape-name">Overhang Test</div>
+      <div class="shape-desc">Analyzes print quality vs overhang angle to determine support-free limits.</div>
+      <div class="shape-dims">
+        <span class="dim-tag">30°</span><span class="dim-tag">45°</span><span class="dim-tag">60°</span><span class="dim-tag">75°</span>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+  <div class="sec-title"><span>02</span> Experiment Parameters</div>
+  <div class="row2">
+    <div class="card">
+      <div class="card-title">Print Speed Tests</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div style="text-align:center;flex:1;min-width:80px;">
+          <div style="font-family:'Orbitron',monospace;font-size:24px;color:var(--accent2);">40</div>
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;">mm/s</div>
+          <div style="font-size:11px;margin-top:4px;">Slow</div>
+        </div>
+        <div style="text-align:center;flex:1;min-width:80px;">
+          <div style="font-family:'Orbitron',monospace;font-size:24px;color:var(--accent);">60</div>
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;">mm/s</div>
+          <div style="font-size:11px;margin-top:4px;">Standard</div>
+        </div>
+        <div style="text-align:center;flex:1;min-width:80px;">
+          <div style="font-family:'Orbitron',monospace;font-size:24px;color:var(--error-neg);">80</div>
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;">mm/s</div>
+          <div style="font-size:11px;margin-top:4px;">Fast</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Layer Height Tests</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div style="text-align:center;flex:1;min-width:60px;">
+          <div style="font-family:'Orbitron',monospace;font-size:24px;color:var(--accent3);">0.1</div>
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;">mm</div><div style="font-size:11px;margin-top:4px;">Fine</div>
+        </div>
+        <div style="text-align:center;flex:1;min-width:60px;">
+          <div style="font-family:'Orbitron',monospace;font-size:24px;color:var(--accent);">0.2</div>
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;">mm</div><div style="font-size:11px;margin-top:4px;">Standard</div>
+        </div>
+        <div style="text-align:center;flex:1;min-width:60px;">
+          <div style="font-family:'Orbitron',monospace;font-size:24px;color:var(--accent2);">0.3</div>
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;">mm</div><div style="font-size:11px;margin-top:4px;">Draft</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+  <div class="sec-title"><span>03</span> Quick Summary</div>
+  <div class="stats-row" id="summary-stats">
+    <div class="stat-card"><div class="stat-val" id="s-total">0</div><div class="stat-label">Total Entries</div></div>
+    <div class="stat-card"><div class="stat-val" id="s-avg" style="font-size:22px;">—</div><div class="stat-label">Avg Error (mm)</div></div>
+    <div class="stat-card"><div class="stat-val" id="s-max" style="font-size:22px;">—</div><div class="stat-label">Max Deviation</div></div>
+    <div class="stat-card"><div class="stat-val" id="s-shapes">0</div><div class="stat-label">Shapes Tested</div></div>
+  </div>
+</section>
+
+<!-- ═══════════════════ DATA ENTRY ═══════════════════ -->
+<section id="data">
+  <div class="sec-title"><span>02</span> Measurement Entry</div>
+  <div class="card">
+    <div class="card-title">Print Parameters</div>
+    <div class="param-grid">
+      <label>Shape / Model
+        <select id="e-shape">
+          <option>Calibration Cube</option>
+          <option>Cylinder</option>
+          <option>Hole Test Plate</option>
+          <option>Wall Thickness Test</option>
+          <option>Overhang Test</option>
+          <option>Other</option>
+        </select>
+      </label>
+      <label>Feature / Dimension
+        <input type="text" id="e-feature" placeholder="e.g. X Axis, Diameter…"/>
+      </label>
+      <label>CAD Dimension (mm)
+        <input type="number" id="e-cad" placeholder="20.00" step="0.01"/>
+      </label>
+      <label>Printed Dimension (mm)
+        <input type="number" id="e-printed" placeholder="19.85" step="0.01"/>
+      </label>
+      <label>Print Speed (mm/s)
+        <select id="e-speed">
+          <option value="40">40 mm/s</option>
+          <option value="60" selected>60 mm/s</option>
+          <option value="80">80 mm/s</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </label>
+      <label>Layer Height (mm)
+        <select id="e-layer">
+          <option value="0.1">0.1 mm (Fine)</option>
+          <option value="0.2" selected>0.2 mm (Standard)</option>
+          <option value="0.3">0.3 mm (Draft)</option>
+        </select>
+      </label>
+      <label>Infill %
+        <input type="number" id="e-infill" placeholder="20" min="0" max="100" value="20"/>
+      </label>
+      <label>Infill Pattern
+        <select id="e-infill-pattern">
+          <option>Grid</option>
+          <option>Lines</option>
+          <option>Triangles</option>
+          <option>Honeycomb</option>
+          <option>Gyroid</option>
+          <option>Cubic</option>
+          <option>Concentric</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Defects Observed</div>
+    <div style="margin-bottom:12px;font-size:12px;color:var(--muted);">Select all defects observed on this print:</div>
+    <div id="defect-checkboxes" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+    </div>
+    <label style="margin-top:8px;">Additional Notes
+      <textarea id="e-notes" placeholder="Any observations, warping extent, layer adhesion issues, stringing severity…"></textarea>
+    </label>
+  </div>
+
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="addEntry()">＋ ADD MEASUREMENT</button>
+    <button class="btn" style="border-color:var(--muted);color:var(--muted);" onclick="clearForm()">CLEAR FORM</button>
+  </div>
+</section>
+
+<!-- ═══════════════════ RESULTS ═══════════════════ -->
+<section id="results">
+  <div class="sec-title"><span>03</span> Results Table</div>
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-val" id="r-total">0</div><div class="stat-label">Measurements</div></div>
+    <div class="stat-card"><div class="stat-val" id="r-avg" style="font-size:20px;color:var(--accent2)">—</div><div class="stat-label">Mean |Error| mm</div></div>
+    <div class="stat-card"><div class="stat-val" id="r-max" style="font-size:20px;color:var(--error-neg)">—</div><div class="stat-label">Max Deviation</div></div>
+    <div class="stat-card"><div class="stat-val" id="r-acc" style="font-size:20px;color:var(--accent3)">—</div><div class="stat-label">% Accuracy</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">All Measurements</div>
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+      <input type="text" id="filter-input" placeholder="Filter by shape or feature…" style="max-width:260px;" oninput="renderTable()"/>
+      <button class="btn btn-sm" style="border-color:var(--accent3);color:var(--accent3);" onclick="exportCSV()">EXPORT CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table id="results-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Shape</th>
+            <th>Feature</th>
+            <th>CAD (mm)</th>
+            <th>Printed (mm)</th>
+            <th>Error (mm)</th>
+            <th>Error %</th>
+            <th>Speed</th>
+            <th>Layer</th>
+            <th>Infill</th>
+            <th>Pattern</th>
+            <th>Defects</th>
+            <th>Notes</th>
+            <th>Del</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <tr><td colspan="14" class="no-data">// NO DATA — ADD MEASUREMENTS IN DATA ENTRY TAB</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ DEFECTS ═══════════════════ -->
+<section id="defects">
+  <div class="sec-title"><span>04</span> Defect Reference & Solutions</div>
+  <div id="defect-table-wrap" class="card" style="margin-bottom:24px;">
+    <div class="card-title">Observed Defects Summary</div>
+    <div id="defect-summary-table">
+      <div class="no-data">// NO DEFECTS LOGGED YET</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Complete Defect Encyclopedia</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Defect</th>
+            <th>Cause</th>
+            <th>Effect on Dimensions</th>
+            <th>Solution</th>
+          </tr>
+        </thead>
+        <tbody id="defect-ref-body"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ ANALYSIS ═══════════════════ -->
+<section id="analysis">
+  <div class="sec-title"><span>05</span> Visual Analysis</div>
+  <div class="row2">
+    <div class="card">
+      <div class="card-title">Error by Shape</div>
+      <canvas id="chart-shape" height="220"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Speed vs Avg Error</div>
+      <canvas id="chart-speed" height="220"></canvas>
+    </div>
+  </div>
+  <div class="row2">
+    <div class="card">
+      <div class="card-title">Layer Height vs Avg Error</div>
+      <canvas id="chart-layer" height="220"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Error Distribution (All Measurements)</div>
+      <canvas id="chart-dist" height="220"></canvas>
+    </div>
+  </div>
+  <div class="card" style="margin-top:0;">
+    <div class="card-title">Conclusion Generator</div>
+    <div id="conclusion-box" style="font-size:13px;line-height:1.8;color:var(--text);min-height:60px;"></div>
+  </div>
+</section>
+
+<div id="toast">✓ SAVED</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+// ═══ STATE ═══
+let entries = JSON.parse(localStorage.getItem('ddm_entries')||'[]');
+
+const DEFECTS_DB = [
+  {name:'Warping', cause:'Thermal contraction, poor bed adhesion', effect:'Corners lift → base dimensions oversize', solution:'Use brim/raft, enclosure, heated bed 60°C, dry filament'},
+  {name:'Stringing', cause:'Over-extrusion, high temp, slow retraction', effect:'Thin webs between features, adds material', solution:'Enable/increase retraction, lower temp by 5–10°C, increase travel speed'},
+  {name:'Under-extrusion', cause:'Partial clog, wrong flow rate, low temp', effect:'Missing material → dimensions undersized, weak walls', solution:'Calibrate e-steps, increase temp, check Bowden tension'},
+  {name:'Over-extrusion', cause:'Flow rate too high, wrong filament diameter', effect:'Excess material → dimensions oversized', solution:'Calibrate flow/extrusion multiplier, measure actual filament Ø'},
+  {name:'Layer Shifting', cause:'Belt loose, motor skipping, speed too high', effect:'X/Y offset between layers, distorted geometry', solution:'Tighten belts, reduce speed, check motor current'},
+  {name:'Ghosting / Ringing', cause:'Vibration from fast moves near sharp corners', effect:'Surface ripples near features, dimensional noise', solution:'Reduce speed/acceleration, add input shaping (Klipper)'},
+  {name:'Elephant Foot', cause:'First layer squish too high, bed temp high', effect:'Base wider than CAD → positive error in XY at base', solution:'Increase Z offset, lower bed temp, use first-layer correction'},
+  {name:'Hole Shrinkage', cause:'Material shrinks inward on concave features', effect:'Internal holes 0.1–0.5mm smaller than CAD', solution:'Apply horizontal expansion offset in slicer (e.g. +0.1mm)'},
+  {name:'Layer Delamination', cause:'Low temp, contaminated filament, draft', effect:'Weak Z strength, splits between layers', solution:'Increase print temp, increase layer overlap, remove draft'},
+  {name:'Blob / Zit', cause:'Seam at layer start/end, ooze', effect:'Local dimension excess at seam location', solution:'Enable seam alignment, optimize retraction, use coasting'},
+  {name:'Pillowing', cause:'Insufficient top layers, low infill, fan too weak', effect:'Wavy top surface, Z dimension inaccuracy at top', solution:'Add top layers (min 5), increase infill, improve cooling'},
+  {name:'Overhangs Drooping', cause:'No support, cooling insufficient, steep angle', effect:'Geometry deviation on angled faces, Z error', solution:'Add supports, increase fan speed, reduce temp for bridges'},
+];
+
+// ═══ INIT DEFECT CHECKBOXES ═══
+function initDefectCheckboxes() {
+  const c = document.getElementById('defect-checkboxes');
+  c.innerHTML = DEFECTS_DB.map((d,i)=>`
+    <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;
+      background:var(--surface);border:1px solid var(--border);padding:6px 10px;color:var(--muted);">
+      <input type="checkbox" id="defect-cb-${i}" style="width:auto;accent-color:var(--accent);">
+      ${d.name}
+    </label>`).join('');
+}
+
+// ═══ DEFECT REF TABLE ═══
+function renderDefectRef() {
+  document.getElementById('defect-ref-body').innerHTML = DEFECTS_DB.map(d=>`
+    <tr>
+      <td><span class="defect-chip">${d.name}</span></td>
+      <td style="font-size:12px;color:var(--muted);">${d.cause}</td>
+      <td style="font-size:12px;">${d.effect}</td>
+      <td><span class="solution-chip">${d.solution}</span></td>
+    </tr>`).join('');
+}
+
+// ═══ TABS ═══
+function showTab(id, btn) {
+  document.querySelectorAll('section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(id==='results') { renderTable(); updateStats(); }
+  if(id==='analysis') { renderCharts(); }
+  if(id==='defects') { renderDefectSummary(); }
+  if(id==='overview') { updateOverviewStats(); }
+}
+
+function setShape(s) {
+  document.getElementById('e-shape').value = s;
+}
+
+// ═══ ADD ENTRY ═══
+function addEntry() {
+  const shape = document.getElementById('e-shape').value;
+  const feature = document.getElementById('e-feature').value.trim();
+  const cad = parseFloat(document.getElementById('e-cad').value);
+  const printed = parseFloat(document.getElementById('e-printed').value);
+  const speed = document.getElementById('e-speed').value;
+  const layer = document.getElementById('e-layer').value;
+  const infill = document.getElementById('e-infill').value;
+  const pattern = document.getElementById('e-infill-pattern').value;
+  const notes = document.getElementById('e-notes').value.trim();
+
+  if(!feature || isNaN(cad) || isNaN(printed)) {
+    showToast('⚠ FILL FEATURE, CAD & PRINTED DIMS', '#ff6b35'); return;
+  }
+
+  const defects = DEFECTS_DB
+    .filter((_,i)=>document.getElementById(`defect-cb-${i}`)?.checked)
+    .map(d=>d.name);
+
+  const error = +(printed - cad).toFixed(4);
+  const errorPct = +((error/cad)*100).toFixed(3);
+
+  entries.push({id:Date.now(), shape, feature, cad, printed, error, errorPct, speed, layer, infill, pattern, defects, notes});
+  save();
+  clearForm();
+  showToast('✓ MEASUREMENT SAVED');
+  document.getElementById('cnt').textContent = entries.length;
+}
+
+function clearForm() {
+  ['e-feature','e-cad','e-printed','e-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('e-infill').value='20';
+  document.querySelectorAll('#defect-checkboxes input[type=checkbox]').forEach(cb=>cb.checked=false);
+}
+
+// ═══ SAVE / LOAD ═══
+function save() {
+  localStorage.setItem('ddm_entries', JSON.stringify(entries));
+  document.getElementById('cnt').textContent = entries.length;
+}
+
+// ═══ RENDER TABLE ═══
+function renderTable() {
+  const filter = document.getElementById('filter-input').value.toLowerCase();
+  const filtered = entries.filter(e=>
+    e.shape.toLowerCase().includes(filter) || e.feature.toLowerCase().includes(filter)
+  );
+
+  const tbody = document.getElementById('table-body');
+  if(!filtered.length){
+    tbody.innerHTML='<tr><td colspan="14" class="no-data">// NO MATCHING ENTRIES</td></tr>'; return;
+  }
+
+  tbody.innerHTML = filtered.map((e,i)=>{
+    const cls = e.error < -0.01 ? 'neg' : e.error > 0.01 ? 'pos' : 'zero';
+    const sign = e.error > 0 ? '+' : '';
+    return `<tr>
+      <td style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);">${i+1}</td>
+      <td>${e.shape}</td>
+      <td style="color:var(--accent);">${e.feature}</td>
+      <td style="font-family:'Space Mono',monospace;">${e.cad}</td>
+      <td style="font-family:'Space Mono',monospace;">${e.printed}</td>
+      <td class="error-cell ${cls}">${sign}${e.error.toFixed(3)}</td>
+      <td class="error-cell ${cls}" style="font-size:11px;">${sign}${e.errorPct.toFixed(2)}%</td>
+      <td style="font-size:11px;">${e.speed} mm/s</td>
+      <td style="font-size:11px;">${e.layer} mm</td>
+      <td style="font-size:11px;">${e.infill}%</td>
+      <td style="font-size:11px;">${e.pattern}</td>
+      <td style="font-size:11px;">${e.defects.length ? e.defects.map(d=>`<span class="defect-chip" style="margin:1px;display:inline-block;">${d}</span>`).join('') : '<span style="color:var(--muted);">None</span>'}</td>
+      <td style="font-size:11px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${e.notes}">${e.notes||'—'}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteEntry(${e.id})">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  updateStats();
+}
+
+function deleteEntry(id) {
+  entries = entries.filter(e=>e.id!==id);
+  save(); renderTable();
+}
+
+// ═══ STATS ═══
+function updateStats() {
+  const n = entries.length;
+  document.getElementById('r-total').textContent = n;
+  if(!n){
+    ['r-avg','r-max','r-acc'].forEach(id=>document.getElementById(id).textContent='—'); return;
+  }
+  const errs = entries.map(e=>Math.abs(e.error));
+  const avg = errs.reduce((a,b)=>a+b,0)/n;
+  const mx = Math.max(...errs);
+  const maxCad = Math.max(...entries.map(e=>e.cad));
+  const acc = ((1-(avg/maxCad))*100);
+  document.getElementById('r-avg').textContent = avg.toFixed(3);
+  document.getElementById('r-max').textContent = mx.toFixed(3);
+  document.getElementById('r-acc').textContent = acc.toFixed(1)+'%';
+}
+
+function updateOverviewStats() {
+  const n = entries.length;
+  document.getElementById('s-total').textContent = n;
+  document.getElementById('s-shapes').textContent = [...new Set(entries.map(e=>e.shape))].length;
+  if(!n){ document.getElementById('s-avg').textContent='—'; document.getElementById('s-max').textContent='—'; return; }
+  const errs = entries.map(e=>Math.abs(e.error));
+  document.getElementById('s-avg').textContent = (errs.reduce((a,b)=>a+b,0)/n).toFixed(3);
+  document.getElementById('s-max').textContent = Math.max(...errs).toFixed(3);
+}
+
+// ═══ CHARTS ═══
+let charts = {};
+function destroyChart(id){ if(charts[id]){charts[id].destroy();delete charts[id];} }
+
+const CHART_DEFAULTS = {
+  color: 'rgba(230,237,243,0.8)',
+  plugins:{ legend:{ labels:{ color:'#8b949e', font:{family:'Space Mono',size:10} } } },
+  scales:{
+    x:{ ticks:{ color:'#8b949e', font:{family:'Space Mono',size:9} }, grid:{color:'rgba(255,255,255,0.05)'} },
+    y:{ ticks:{ color:'#8b949e', font:{family:'Space Mono',size:9} }, grid:{color:'rgba(255,255,255,0.05)'} }
+  }
+};
+
+function renderCharts() {
+  if(!entries.length){ ['chart-shape','chart-speed','chart-layer','chart-dist'].forEach(id=>{
+    const ctx=document.getElementById(id).getContext('2d');
+    ctx.fillStyle='#8b949e'; ctx.font='12px Space Mono'; ctx.fillText('NO DATA',80,60);
+  }); return; }
+
+  // ── Shape chart
+  destroyChart('cs');
+  const shapes = [...new Set(entries.map(e=>e.shape))];
+  const shapeAvg = shapes.map(s=>{
+    const es = entries.filter(e=>e.shape===s).map(e=>Math.abs(e.error));
+    return es.reduce((a,b)=>a+b,0)/es.length;
+  });
+  charts['cs'] = new Chart(document.getElementById('chart-shape'),{
+    type:'bar',
+    data:{ labels:shapes, datasets:[{
+      label:'Avg |Error| mm', data:shapeAvg,
+      backgroundColor:'rgba(0,229,255,0.3)', borderColor:'rgba(0,229,255,0.8)', borderWidth:1
+    }]},
+    options:{...CHART_DEFAULTS, plugins:{...CHART_DEFAULTS.plugins}}
+  });
+
+  // ── Speed chart
+  destroyChart('csp');
+  const speeds = [...new Set(entries.map(e=>e.speed))].sort((a,b)=>+a-+b);
+  const speedAvg = speeds.map(sp=>{
+    const es = entries.filter(e=>e.speed===sp).map(e=>Math.abs(e.error));
+    return es.length ? es.reduce((a,b)=>a+b,0)/es.length : 0;
+  });
+  charts['csp'] = new Chart(document.getElementById('chart-speed'),{
+    type:'line',
+    data:{ labels:speeds.map(s=>s+' mm/s'), datasets:[{
+      label:'Avg |Error| mm', data:speedAvg,
+      borderColor:'#ff6b35', backgroundColor:'rgba(255,107,53,0.1)',
+      pointBackgroundColor:'#ff6b35', tension:0.3, fill:true
+    }]},
+    options:CHART_DEFAULTS
+  });
+
+  // ── Layer chart
+  destroyChart('cl');
+  const layers = [...new Set(entries.map(e=>e.layer))].sort((a,b)=>+a-+b);
+  const layerAvg = layers.map(l=>{
+    const es = entries.filter(e=>e.layer===l).map(e=>Math.abs(e.error));
+    return es.length ? es.reduce((a,b)=>a+b,0)/es.length : 0;
+  });
+  charts['cl'] = new Chart(document.getElementById('chart-layer'),{
+    type:'line',
+    data:{ labels:layers.map(l=>l+' mm'), datasets:[{
+      label:'Avg |Error| mm', data:layerAvg,
+      borderColor:'#7cfc00', backgroundColor:'rgba(124,252,0,0.1)',
+      pointBackgroundColor:'#7cfc00', tension:0.3, fill:true
+    }]},
+    options:CHART_DEFAULTS
+  });
+
+  // ── Distribution
+  destroyChart('cd');
+  const bins = [-0.5,-0.4,-0.3,-0.2,-0.1,0,0.1,0.2,0.3,0.4,0.5];
+  const hist = Array(bins.length-1).fill(0);
+  entries.forEach(e=>{
+    for(let i=0;i<bins.length-1;i++){
+      if(e.error>=bins[i] && e.error<bins[i+1]){hist[i]++;break;}
+    }
+  });
+  const labels = bins.slice(0,-1).map((b,i)=>`${b}~${bins[i+1]}`);
+  charts['cd'] = new Chart(document.getElementById('chart-dist'),{
+    type:'bar',
+    data:{ labels, datasets:[{
+      label:'Count', data:hist,
+      backgroundColor:labels.map((_,i)=>{
+        const mid=(bins[i]+bins[i+1])/2;
+        return mid<-0.01?'rgba(255,77,109,0.5)':mid>0.01?'rgba(0,229,255,0.5)':'rgba(124,252,0,0.5)';
+      }),
+      borderWidth:0
+    }]},
+    options:CHART_DEFAULTS
+  });
+
+  // ── Conclusion
+  generateConclusion();
+}
+
+function generateConclusion() {
+  if(!entries.length){ document.getElementById('conclusion-box').innerHTML='<span style="color:var(--muted);">// Add measurements to generate conclusion</span>'; return; }
+  const errs = entries.map(e=>Math.abs(e.error));
+  const avg = errs.reduce((a,b)=>a+b,0)/errs.length;
+  const mx = Math.max(...errs);
+  const allDefects = entries.flatMap(e=>e.defects);
+  const topDefect = allDefects.length ? [...allDefects.reduce((m,d)=>{m.set(d,(m.get(d)||0)+1);return m;},new Map())].sort((a,b)=>b[1]-a[1])[0][0] : null;
+
+  const speeds = [...new Set(entries.map(e=>e.speed))];
+  let speedConclusion = '';
+  if(speeds.length>1){
+    const spAvg = speeds.map(sp=>({sp,avg:entries.filter(e=>e.speed===sp).map(e=>Math.abs(e.error)).reduce((a,b)=>a+b,0)/entries.filter(e=>e.speed===sp).length}));
+    const best = spAvg.sort((a,b)=>a.avg-b.avg)[0];
+    speedConclusion = ` Print speed analysis indicates <strong>${best.sp} mm/s</strong> produced the lowest dimensional error.`;
+  }
+
+  document.getElementById('conclusion-box').innerHTML = `
+    <strong style="color:var(--accent);font-family:Orbitron,monospace;font-size:12px;">STUDY CONCLUSION</strong><br><br>
+    In this study on <em>CAD Model Dimension vs Printed Dimension Accuracy</em> for Digital Direct Manufacturing using PLA material,
+    a total of <strong>${entries.length} measurements</strong> were recorded across
+    <strong>${[...new Set(entries.map(e=>e.shape))].length} test geometry types</strong>.
+    The average absolute dimensional deviation was <strong style="color:var(--accent2);">${avg.toFixed(3)} mm</strong>,
+    with a maximum observed deviation of <strong style="color:var(--error-neg);">${mx.toFixed(3)} mm</strong>.${speedConclusion}
+    ${topDefect ? `The most frequently observed print defect was <span class="defect-chip">${topDefect}</span>, which contributes to dimensional inaccuracy through material displacement or geometric distortion.` : ''}
+    <br><br>Primary causes of deviation in FFF/FDM printing include <strong>thermal shrinkage</strong> of PLA during cooling,
+    <strong>extrusion flow variation</strong>, and <strong>printer calibration tolerances</strong>.
+    Dimensional accuracy can be improved through careful e-step calibration, flow rate tuning, and application of slicer-level compensation offsets.
+  `;
+}
+
+// ═══ DEFECT SUMMARY ═══
+function renderDefectSummary() {
+  const allDefects = entries.flatMap(e=>e.defects);
+  if(!allDefects.length){
+    document.getElementById('defect-summary-table').innerHTML='<div class="no-data">// NO DEFECTS LOGGED</div>'; return;
+  }
+  const counts = [...allDefects.reduce((m,d)=>{m.set(d,(m.get(d)||0)+1);return m;},new Map())].sort((a,b)=>b[1]-a[1]);
+  const total = allDefects.length;
+  const html = `<table><thead><tr><th>Defect</th><th>Count</th><th>Frequency</th><th>Solution</th></tr></thead><tbody>
+    ${counts.map(([d,c])=>{
+      const ref = DEFECTS_DB.find(x=>x.name===d)||{solution:'See defect encyclopedia below.'};
+      return `<tr>
+        <td><span class="defect-chip">${d}</span></td>
+        <td style="font-family:'Space Mono',monospace;">${c}</td>
+        <td>
+          <div class="error-bar-wrap">
+            <div class="error-bar"><div class="error-bar-fill" style="width:${(c/total*100).toFixed(0)}%;background:var(--error-neg);"></div></div>
+            <span style="font-size:10px;font-family:'Space Mono',monospace;">${(c/total*100).toFixed(0)}%</span>
+          </div>
+        </td>
+        <td><span class="solution-chip">${ref.solution}</span></td>
+      </tr>`;
+    }).join('')}
+  </tbody></table>`;
+  document.getElementById('defect-summary-table').innerHTML = html;
+}
+
+// ═══ EXPORT CSV ═══
+function exportCSV() {
+  if(!entries.length){ showToast('⚠ NO DATA TO EXPORT', '#ff6b35'); return; }
+  const header = ['Shape','Feature','CAD_mm','Printed_mm','Error_mm','Error_%','Speed_mm-s','Layer_mm','Infill_%','Pattern','Defects','Notes'];
+  const rows = entries.map(e=>[e.shape,e.feature,e.cad,e.printed,e.error,e.errorPct,e.speed,e.layer,e.infill,e.pattern,e.defects.join(';'),e.notes].map(v=>`"${v}"`).join(','));
+  const csv = [header.join(','), ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download = 'DDM_3DPrint_Accuracy_Data.csv';
+  a.click();
+}
+
+// ═══ TOAST ═══
+function showToast(msg='✓ SAVED', bg='var(--accent)') {
+  const t = document.getElementById('toast');
+  t.textContent=msg; t.style.background=bg; t.style.color=bg.includes('ff6b35')?'#fff':'#000';
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+// ═══ INIT ═══
+initDefectCheckboxes();
+renderDefectRef();
+document.getElementById('cnt').textContent = entries.length;
+updateOverviewStats();
+</script>
+</body>
+</html>
